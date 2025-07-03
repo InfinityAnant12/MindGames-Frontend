@@ -14,9 +14,6 @@
     "react-dom": "^19.1.0",
     "buffer": "^6.0.3",
     "socket.io-client": "^4.7.5",
-    "express": "^5.1.0",
-    "http": "^0.0.1-security",
-    "socket.io": "^4.8.1"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
