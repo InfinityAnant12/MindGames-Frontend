@@ -17,7 +17,7 @@ type LobbyScreen = 'initial' | 'hosting' | 'joining' | 'waiting_for_host' | 'wai
 
 
 const AI_THINK_DELAY = 1500; 
-const SERVER_URL = 'https://ai-weed-farmer-660582789312.us-west1.run.app'; // Backend server URL
+const SERVER_URL = 'https://mindgames-backend.onrender.com'; // Backend server URL
 
 const App: React.FC = () => {
   const [gameState, setGameState] = useState<GameState | null>(null);
