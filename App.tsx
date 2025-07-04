@@ -790,6 +790,8 @@ const App: React.FC = () => {
       <div style={{ position: 'fixed', bottom: '5px', left: '5px', color: 'rgba(255, 255, 255, 0.7)', fontSize: '10px', zIndex: 9999, textShadow: '1px 1px 2px black' }}>
         Version 1.1
       </div>
+      {/* ✅ Add this line at the very end */}
+    <Analytics />
     </>
   );
 };
