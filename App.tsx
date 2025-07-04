@@ -793,11 +793,14 @@ const App: React.FC = () => {
     </>
   );
 };
-return (
-  <>
-    {/* Your app's structure like GameModeSelection, GameBoard, etc. */}
-    
-    <Analytics /> {/* Vercel Analytics Component */}
-  </>
-);
+function App() {
+  // your logic here
+
+  return (
+    <>
+      {/* Your app's structure like GameModeSelection, GameBoard, etc. */}
+      <Analytics />
+    </>
+  );
+}
 export default App;
