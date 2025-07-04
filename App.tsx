@@ -792,7 +792,6 @@ const App: React.FC = () => {
       </div>
       {/* ✅ Add this line at the very end */}
     <Analytics />
-    </div>
     </>
   );
 };
