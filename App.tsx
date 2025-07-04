@@ -11,7 +11,7 @@ import Confetti from './components/Confetti';
 import * as gameService from './services/gameService';
 import * as aiService from './services/aiService'; 
 import { io, Socket } from 'socket.io-client';
-import { Analytics } from "@vercel/analytics/react";
+import { Analytics } from '@vercel/analytics/react';
 
 type GameMode = 'single' | 'multiplayer' | null;
 type LobbyScreen = 'initial' | 'hosting' | 'joining' | 'waiting_for_host' | 'waiting_for_players' | 'in_game_lobby';
