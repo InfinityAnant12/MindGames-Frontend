@@ -793,14 +793,5 @@ const App: React.FC = () => {
     </>
   );
 };
-function App() {
-  // your logic here
 
-  return (
-    <>
-      {/* Your app's structure like GameModeSelection, GameBoard, etc. */}
-      <Analytics />
-    </>
-  );
-}
 export default App;
