@@ -1,6 +1,9 @@
 
+
 import React, { useState } from 'react';
 import ActionButton from './ActionButton';
+import { Player } from '../types';
+import { MIN_PLAYERS, MAX_PLAYERS } from '../constants';
 
 type LobbyScreen = 'initial' | 'hosting' | 'joining' | 'waiting_for_host' | 'waiting_for_players' | 'in_game_lobby'; // Added 'in_game_lobby'
 
@@ -11,6 +14,7 @@ interface MultiplayerLobbyProps {
   joinLinkInput: string;
   lobbyMessage: string;
   playerNameInput: string;
+  playersInLobby: Player[];
   onPlayerNameChange: (name: string) => void;
   onHostGame: () => void;
   onNavigateToJoinScreen: () => void;
@@ -29,6 +33,7 @@ const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
   joinLinkInput,
   lobbyMessage,
   playerNameInput,
+  playersInLobby,
   onPlayerNameChange,
   onHostGame,
   onNavigateToJoinScreen,
@@ -69,6 +74,19 @@ const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
       />
     </div>
   );
+  
+  const playerList = (
+    <div className="my-4 w-full max-w-sm mx-auto">
+        <h3 className="text-lg font-semibold text-gray-700 mb-2">Players in Lobby ({playersInLobby.length}/{MAX_PLAYERS})</h3>
+        <ul className="bg-gray-50 rounded-lg p-3 text-left space-y-2 shadow-inner">
+            {playersInLobby.map(p => (
+                <li key={p.id} className="text-gray-800 text-base">
+                    <span className="font-semibold">{p.name}</span> {p.isHost && <span className="text-xs font-bold text-purple-600">(Host)</span>}
+                </li>
+            ))}
+        </ul>
+    </div>
+  );
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 p-6">
@@ -105,7 +123,7 @@ const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
 
         {lobbyScreen === 'hosting' && hostedGameLink && (
           <>
-            <h1 className="text-3xl sm:text-4xl font-bold mb-6 text-purple-700">Game Hosted!</h1>
+            <h1 className="text-3xl sm:text-4xl font-bold mb-2 text-purple-700">Game Hosted!</h1>
             <p className="text-gray-700 mb-2 text-md">Welcome, {playerNameInput} (Host)!</p>
             <p className="text-gray-700 mb-4 text-lg">Share this link with your friends:</p>
             <div className="mb-4 p-3 bg-purple-100 rounded-md shadow-sm text-purple-700 break-all select-all">
@@ -113,12 +131,13 @@ const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
             </div>
             <ActionButton 
               onClick={handleCopyLink} 
-              className="w-full text-lg py-3 mb-4" 
+              className="w-full text-lg py-3 mb-2" 
               variant="primary"
             >
               {linkCopied ? 'Link Copied!' : 'Copy Link'}
             </ActionButton>
-            <p className="text-gray-600 mb-6 italic min-h-[2em]">{lobbyMessage || 'Waiting for players to join...'}</p>
+            {playerList}
+            <p className="text-gray-600 mb-4 italic min-h-[2em]">{lobbyMessage || 'Waiting for players to join...'}</p>
             {isHost && (
                 <ActionButton 
                     onClick={onStartGame} 
@@ -126,7 +145,7 @@ const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
                     variant="primary"
                     disabled={!canStartGame}
                 >
-                    {canStartGame ? 'Start Game' : 'Waiting for more players...'}
+                    {canStartGame ? 'Start Game' : `Waiting for more players (${MIN_PLAYERS} min)`}
                 </ActionButton>
             )}
           </>
@@ -158,31 +177,24 @@ const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
         {(lobbyScreen === 'waiting_for_host' || lobbyScreen === 'waiting_for_players') && (
             <>
                 <h1 className="text-3xl sm:text-4xl font-bold mb-6 text-purple-700">
-                    {lobbyScreen === 'waiting_for_host' ? "Waiting for Host" : "Waiting for Other Players"}
+                    Waiting in Lobby
                 </h1>
                 <p className="text-gray-700 mb-2 text-md">Welcome, {playerNameInput}!</p>
-                <div className="my-8 flex flex-col items-center justify-center space-y-3">
-                    <svg className="animate-spin h-10 w-10 text-purple-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <p className="text-gray-700 text-lg animate-pulse">
-                        {lobbyMessage || "Connected to game lobby. Waiting..."}
-                    </p>
-                </div>
-                 {!isHost && lobbyScreen === 'waiting_for_players' && (
-                    <p className="text-sm text-gray-500 mt-4">Waiting for the host to start the game.</p>
+                {playerList}
+                 {!isHost && (
+                    <p className="text-sm text-gray-500 mt-4 animate-pulse">Waiting for the host to start the game.</p>
                 )}
-                 {isHost && lobbyScreen === 'waiting_for_players' && (
+                 {isHost && (
                     <ActionButton 
                         onClick={onStartGame} 
                         className="w-full text-lg py-3 mt-4" 
                         variant="primary"
                         disabled={!canStartGame}
                     >
-                         {canStartGame ? 'Start Game' : 'Waiting for more players...'}
+                         {canStartGame ? 'Start Game Now!' : `Waiting for more players (${MIN_PLAYERS} min)`}
                     </ActionButton>
                 )}
+                {lobbyMessage && <p className="text-gray-600 mt-4 italic min-h-[1.5em]">{lobbyMessage}</p>}
             </>
         )}
 
@@ -191,7 +203,7 @@ const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
         </ActionButton>
       </div>
        <footer className="mt-8 text-center text-purple-100 text-sm">
-        <p>&copy; 2024 High Roller Games. Multiplayer features are under development.</p>
+        <p>&copy; 2025 Infinity High Games. For entertainment purposes only.</p>
       </footer>
     </div>
   );

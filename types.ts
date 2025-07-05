@@ -1,4 +1,5 @@
 
+
 export enum CardType {
   PLANT = 'PLANT',
   POWER = 'POWER',
@@ -101,12 +102,12 @@ export interface ClientToServerEvents {
   'player-action': (data: { gameId: string; playerId: string; action: PlayerActionPayload }) => void;
   'start-game-request': (data: {gameId: string, playerId: string}) => void;
   'request-game-state': (gameId: string) => void; // For re-syncing if needed
+  'start-next-round': (data: { gameId: string; playerId: string }) => void;
 }
 
 export interface ServerToClientEvents {
-  'game-created': (data: { gameId: string; playerId: string, initialGameState: GameState }) => void;
-  'player-joined-room': (data: { newPlayer: Player, roomSize: number, gameState: GameState }) => void;
-  'player-left-room': (data: { playerId: string, roomSize: number, gameState: GameState }) => void;
+  'player-joined-room': (data: { gameState: GameState }) => void;
+  'player-left-room': (data: { gameState: GameState, message: string }) => void;
   'game-started': (gameState: GameState) => void;
   'game-state-update': (gameState: GameState) => void;
   'error-message': (data: { message: string }) => void;

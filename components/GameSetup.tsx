@@ -68,7 +68,7 @@ const GameSetup: React.FC<GameSetupProps> = ({ onSetupComplete }) => {
         </ActionButton>
       </div>
        <footer className="mt-8 text-center text-green-100 text-sm">
-        <p>&copy; 2024 High Roller Games. For entertainment purposes only.</p>
+        <p>&copy; 2025 Infinity High Games. For entertainment purposes only.</p>
       </footer>
     </div>
   );

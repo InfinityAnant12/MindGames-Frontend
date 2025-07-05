@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { GameState, Player, GameCard, CardType, PlantCard, PowerCard, PowerCardName, GamePhase, TargetSelection } from '../types';
 import PlayerDisplay from './PlayerDisplay';
@@ -67,7 +68,7 @@ const GameBoard: React.FC<GameBoardProps> = ({
       </div>
       
       <header className="mb-4 text-center">
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-emerald-400">Weed Game v2</h1>
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-emerald-400">Weed Game</h1>
         {gameState.message && <p className="text-sm sm:text-md md:text-lg text-emerald-300 mt-1">{gameState.message}</p>}
         {gameState.targetSelection && <p className="text-sm sm:text-md md:text-lg text-amber-400 font-semibold mt-1 animate-pulse">{getTargetingMessage()}</p>}
       </header>

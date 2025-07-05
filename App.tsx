@@ -1,7 +1,13 @@
 
+
+
+
+
+
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { GameState, GamePhase, Player, GameCard, CardType, PowerCardName, PlantCard, PowerCard, TargetSelection, Pot, PlayerActionPayload, ClientToServerEvents, ServerToClientEvents } from './types';
-import { WINNING_SCORE, MAX_PLAYERS as MAX_SINGLE_PLAYERS } from './constants'; // Renamed for clarity
+import { WINNING_SCORE, MIN_PLAYERS, MAX_PLAYERS } from './constants';
 import GameSetup from './components/GameSetup';
 import GameBoard from './components/GameBoard';
 import Modal from './components/Modal';
@@ -11,14 +17,13 @@ import Confetti from './components/Confetti';
 import * as gameService from './services/gameService';
 import * as aiService from './services/aiService'; 
 import { io, Socket } from 'socket.io-client';
-import { Analytics } from '@vercel/analytics/react';
 
 type GameMode = 'single' | 'multiplayer' | null;
 type LobbyScreen = 'initial' | 'hosting' | 'joining' | 'waiting_for_host' | 'waiting_for_players' | 'in_game_lobby';
 
 
-const AI_THINK_DELAY = 1500; 
-const SERVER_URL = 'https://mindgames-backend.onrender.com'; // Backend server URL
+const AI_THINK_DELAY = 0; 
+const SERVER_URL = 'https://gamebackend-hyqi.onrender.com'; // Backend server URL
 
 const App: React.FC = () => {
   const [gameState, setGameState] = useState<GameState | null>(null);
@@ -72,34 +77,40 @@ const App: React.FC = () => {
 
     newSocket.on('connect', () => {
       console.log('Connected to socket server with ID:', newSocket.id);
-      // setUserId(newSocket.id); // Server will confirm player ID on join/host
     });
     
-    newSocket.on('player-joined-room', ({ newPlayer, roomSize, gameState: updatedGameState }) => {
-        setLobbyMessage(`${newPlayer.name} joined! Players in room: ${roomSize}.`);
-        setGameState(updatedGameState); // Update with latest state
-        // If I am the host and more players can join, keep waiting
-        // If room is full or host decides to start, transition phase
+    newSocket.on('player-joined-room', ({ gameState: updatedGameState }) => {
+        const newPlayer = updatedGameState.players[updatedGameState.players.length - 1];
+        setLobbyMessage(`${newPlayer.name} joined! Players: ${updatedGameState.players.length}/${MAX_PLAYERS}.`);
+        setGameState(updatedGameState);
+    });
+
+    newSocket.on('player-left-room', ({ gameState: updatedGameState, message }) => {
+        setLobbyMessage(message);
+        setGameState(updatedGameState);
     });
 
     newSocket.on('game-started', (initialGameState) => {
         setLobbyMessage('Game is starting!');
         setGameState(initialGameState);
-        setSelectedGameMode('multiplayer'); // Ensure mode is set
-        setLobbyScreen('in_game_lobby'); // Or directly to playing if gamePhase dictates
+        setSelectedGameMode('multiplayer'); 
+        setLobbyScreen('in_game_lobby'); 
     });
     
     newSocket.on('game-state-update', (updatedGameState) => {
         console.log('Received game state update from server');
+        // Preserve local onSelect function if targeting is active
+        if (updatedGameState.targetSelection && gameState?.targetSelection) {
+            updatedGameState.targetSelection.onSelect = gameState.targetSelection.onSelect;
+        }
         setGameState(updatedGameState);
     });
 
     newSocket.on('error-message', ({ message }) => {
+        alert(`Server Error: ${message}`); // Use alert for critical errors
         setLobbyMessage(`Error: ${message}`);
-        // Potentially reset lobby screen if error is critical
-        if (message.includes("not found") || message.includes("full")) {
-            setLobbyScreen('initial');
-            setHostedGameLink(null);
+        if (message.includes("host has disconnected")) {
+            handleBackToModeSelection();
         }
     });
 
@@ -115,8 +126,6 @@ const App: React.FC = () => {
 
     newSocket.on('disconnect', () => {
         console.log('Disconnected from socket server');
-        // setLobbyMessage('Disconnected. Please try again.');
-        // setSelectedGameMode(null); // Or try to reconnect
     });
   };
 
@@ -251,7 +260,7 @@ const App: React.FC = () => {
           setGameState(response.gameState);
           setUserId(response.playerId);
           setSelectedGameMode('multiplayer');
-          setLobbyScreen('in_game_lobby'); // Or 'waiting_for_players'
+          setLobbyScreen('waiting_for_host'); 
           setLobbyMessage(response.message);
         } else {
           setLobbyMessage(`Failed to join: ${response.message}`);
@@ -316,12 +325,21 @@ const App: React.FC = () => {
   const handleInitiatePlayCard = (card: GameCard, player: Player) => {
     if (!gameState || gameState.gamePhase === GamePhase.GAME_OVER || gameState.gamePhase === GamePhase.ROUND_OVER ) return;
     
-    if (player.id !== userId && selectedGameMode === 'multiplayer') { // Check against current socket's player ID
-         setGameState(prev => gameService.addLogEntry(prev!, "Not your turn (Multiplayer).")); return;
+    if (player.id !== userId) {
+        if(gameState.targetSelection && gameState.targetSelection.cardPlayed.id === card.id) {
+            // allow cancelling even if not your turn
+        } else {
+            setGameState(prev => gameService.addLogEntry(prev!, "Not your card.")); return;
+        }
     }
+
     if (player.id !== gameState.players[gameState.currentPlayerIndex].id) {
-      setGameState(prev => gameService.addLogEntry(prev!, "It's not your turn to play a card."));
-      return;
+        if(gameState.targetSelection && gameState.targetSelection.cardPlayed.id === card.id) {
+            // allow cancelling even if not your turn
+        } else {
+          setGameState(prev => gameService.addLogEntry(prev!, "It's not your turn to play a card."));
+          return;
+        }
     }
 
     if (gameState.targetSelection && gameState.targetSelection.cardPlayed.id === card.id) {
@@ -466,15 +484,11 @@ const App: React.FC = () => {
   };
 
   const handleCardClickInHand = (card: GameCard, player: Player) => {
-    if (!gameState || player.id !== userId && selectedGameMode === 'multiplayer') return; // Only current user can interact with their hand
-    if (player.id !== gameState.players[gameState.currentPlayerIndex].id ) {
-        if (gameState.targetSelection?.cardPlayed.id === card.id) { handleInitiatePlayCard(card, player); }
-        return;
-    }
-    if (gameState.turnActionDone && selectedGameMode === 'single') return;
-
-
+    if (!gameState) return;
+    if (player.id !== userId) return; // Only current user can interact with their hand
+    
     if (isDiscardModeActive) {
+      if (player.id !== gameState.players[gameState.currentPlayerIndex].id) return;
       if (selectedGameMode === 'single') {
         setGameState(prev => gameService.discardCardLogic(prev!, player.id, card.id));
       } else {
@@ -496,6 +510,7 @@ const App: React.FC = () => {
       if (roundEndedByCondition) {
         nextState = gameService.calculateRoundScores(nextState);
         nextState = gameService.determineRoundWinner(nextState);
+        nextState = gameService.tallyScores(nextState); // Tally scores after finding winner
         const gameWinner = gameService.checkForGameEnd(nextState);
         if (gameWinner) {
           nextState.gamePhase = GamePhase.GAME_OVER;
@@ -548,11 +563,17 @@ const App: React.FC = () => {
             setGameState(null); 
         }
         isProcessingAiTurnRef.current = false;
-    } else { // Multiplayer: Server handles round/game end state changes
+    } else { // Multiplayer: Host handles progressing from ROUND_OVER
         if (gameState.gamePhase === GamePhase.GAME_OVER) {
             handleBackToModeSelection(); // Go back to lobby after MP game over
         }
-        // For round over in MP, server would send new state for new round
+        if (gameState.gamePhase === GamePhase.ROUND_OVER) {
+            const isHost = gameState.players.find(p => p.id === userId)?.isHost || false;
+            if (isHost && socketRef.current && gameState.gameId) {
+                // Host clicks button to start the next round.
+                socketRef.current.emit('start-next-round', { gameId: gameState.gameId, playerId: userId });
+            }
+        }
     }
   };
   
@@ -642,8 +663,15 @@ const App: React.FC = () => {
   if (!selectedGameMode) {
     return <GameModeSelection onSelectMode={handleModeSelect} />;
   }
+  
+  const isMultiplayerInLobby = selectedGameMode === 'multiplayer' && (
+    !gameState || 
+    gameState.gamePhase === GamePhase.MULTIPLAYER_LOBBY || 
+    gameState.gamePhase === GamePhase.MULTIPLAYER_WAITING
+  );
 
-  if (selectedGameMode === 'multiplayer' && (!gameState || lobbyScreen !== 'in_game_lobby' && gameState.gamePhase !== GamePhase.PLAYING && gameState.gamePhase !== GamePhase.ROUND_OVER && gameState.gamePhase !== GamePhase.GAME_OVER)) {
+
+  if (isMultiplayerInLobby) {
     return <MultiplayerLobby 
               onBack={handleBackToModeSelection}
               lobbyScreen={lobbyScreen}
@@ -658,8 +686,9 @@ const App: React.FC = () => {
               onJoinLinkInputChange={setJoinLinkInput}
               onSetLobbyScreen={setLobbyScreen} 
               onStartGame={handleStartMultiplayerGame}
+              playersInLobby={gameState?.players || []}
               isHost={gameState?.players.find(p=>p.id === userId)?.isHost || false}
-              canStartGame={gameState?.players.length ? gameState.players.length >= 2 : false} // Simple condition for host
+              canStartGame={gameState ? gameState.players.length >= MIN_PLAYERS && gameState.players.length <= MAX_PLAYERS : false}
             />;
   }
 
@@ -667,14 +696,14 @@ const App: React.FC = () => {
     return <GameSetup onSetupComplete={initGame} />;
   }
   
-  if (!gameState) { // Should be covered by multiplayer lobby or single player setup
-      setSelectedGameMode(null); 
+  if (!gameState) {
+      handleBackToModeSelection();
       return <GameModeSelection onSelectMode={handleModeSelect} />;
   }
 
   const currentPlayer = gameState.players[gameState.currentPlayerIndex];
-  const isMyTurnForUI = currentPlayer.id === userId; // Used for UI enablement like discard button
-  const canPlayerDiscard = (isMobile || (!isMobile && isMyTurnForUI)) && !currentPlayer.isSkipped && !gameState.targetSelection && !gameState.turnActionDone;
+  const isMyTurnForUI = currentPlayer.id === userId;
+  const canPlayerDiscard = isMyTurnForUI && !currentPlayer.isSkipped && !gameState.targetSelection && !gameState.turnActionDone;
 
   return (
     <>
@@ -697,7 +726,11 @@ const App: React.FC = () => {
         isOpen={gameState.gamePhase === GamePhase.ROUND_OVER}
         title="Round Over!"
         onClose={handleModalClose}
-        closeButtonText={selectedGameMode === 'single' ? "Start Next Round" : "Waiting for Host..."}
+        closeButtonText={
+            (selectedGameMode === 'single' || (gameState.players.find(p => p.id === userId)?.isHost)) 
+            ? "Start Next Round" 
+            : "Waiting for Host..."
+        }
         showCloseButton={selectedGameMode === 'single' || (gameState.players.find(p => p.id === userId)?.isHost || false)}
       >
         <p className="text-xl mb-2">
@@ -720,7 +753,7 @@ const App: React.FC = () => {
       >
         <p className="text-2xl mb-4 font-bold text-emerald-600">
             {gameState.gameWinner ? 
-                `${gameState.gameWinner.name}, congratulations you are the Real Potzilla!` :
+                `Congratulations ${gameState.gameWinner.name}! You are the Real Potzilla 🦖` :
                 "The game has concluded!"}
         </p>
         <h4 className="text-lg font-semibold mb-2">Final Scores:</h4>
@@ -790,8 +823,6 @@ const App: React.FC = () => {
       <div style={{ position: 'fixed', bottom: '5px', left: '5px', color: 'rgba(255, 255, 255, 0.7)', fontSize: '10px', zIndex: 9999, textShadow: '1px 1px 2px black' }}>
         Version 1.1
       </div>
-      {/* ✅ Add this line at the very end */}
-    <Analytics />
     </>
   );
 };

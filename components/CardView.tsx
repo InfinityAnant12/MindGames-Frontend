@@ -10,7 +10,7 @@ interface CardViewProps {
 }
 
 const getCardImageUrl = (card: GameCard): string => {
-  const basePath = '/assets/cards/';
+  const basePath = '/public/assets/cards/';
   if (card.type === CardType.PLANT) {
     const plantCard = card as PlantCard;
     // Assuming images are named plant_1.png, plant_2.png, etc.

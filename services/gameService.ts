@@ -518,16 +518,20 @@ export const calculateRoundScores = (gameState: GameState): GameState => {
   return newState;
 };
 
+export const tallyScores = (gameState: GameState): GameState => {
+  let newState = { ...gameState };
+  newState.players = newState.players.map(p => {
+    const currentRoundScoreValue = p.roundScore || 0;
+    const previousTotalScore = p.score || 0;
+    return { ...p, score: previousTotalScore + currentRoundScoreValue };
+  });
+  return newState;
+};
+
 export const determineRoundWinner = (gameState: GameState): GameState => {
   let newState = { ...gameState };
   let maxRoundScore = -1;
   let currentRoundWinners: Player[] = [];
-
-  newState.players = newState.players.map(p => {
-    const currentRoundScoreValue = p.roundScore || 0; 
-    const previousTotalScore = p.score || 0;       
-    return { ...p, score: previousTotalScore + currentRoundScoreValue };
-  });
 
   newState.players.forEach(player => {
     if (player.roundScore > maxRoundScore) {
@@ -603,21 +607,21 @@ export const checkForGameEnd = (gameState: GameState): Player | null => {
 export const startNewRound = (gameState: GameState): GameState => {
   let newDeck = shuffleDeck([...INITIAL_DECK.map(card => ({...card, id: uuidv4()}))]); 
   
-  let oldDiscardPile: GameCard[] = [...gameState.discardPile]; 
+  const playersWithPreservedScores = gameState.players.map(p => ({
+    id: p.id,
+    name: p.name,
+    score: p.score, // Preserve total score
+    isHost: p.isHost,
+  }));
 
-  const players = gameState.players.map(p_orig => {
-    const p = {...p_orig}; 
-    p.pots.forEach(pot => {
-      if (pot.card) oldDiscardPile.push(pot.card);
-    });
-    p.hand.forEach(card => oldDiscardPile.push(card));
-
-    const newPlayer = createInitialPlayer(p.id, p.name); 
-    newPlayer.score = p.score; 
-    newPlayer.isSkipped = false; 
-    newPlayer.roundScore = 0; 
+  const players = playersWithPreservedScores.map(p_base => {
+    const newPlayer = createInitialPlayer(p_base.id, p_base.name);
+    newPlayer.score = p_base.score; // Apply the preserved total score
+    newPlayer.isHost = p_base.isHost;
+    // createInitialPlayer already sets roundScore to 0, hand to [], pots to empty.
     return newPlayer;
   });
+
 
   players.forEach(player => {
     for (let i = 0; i < STARTING_HAND_SIZE; i++) {
@@ -643,6 +647,7 @@ export const startNewRound = (gameState: GameState): GameState => {
     currentPlayerIndex: nextRoundStarterIndex, 
     gamePhase: GamePhase.PLAYING,
     roundWinner: null,
+    gameWinner: null, // Explicitly reset game winner
     gameLog: [...(gameState.gameLog || []), "New round started!"].slice(-20),
     message: `${players[nextRoundStarterIndex].name}'s turn. Select a card or action.`,
     targetSelection: null,
